@@ -7,11 +7,14 @@ use anchor_client::{solana_sdk::{
 },
 Client, Cluster, ClientError};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use std::rc::Rc;
 use omni_oracle::{Reputation, SetReputation, UpdatePrice, InitializeAsset, CustomError, Asset};
 
+//initialize asset fn
 pub async fn initialize_asset(
     program: &Program<Rc<Keypair>>,
+    name: String,
     assetId: Pubkey,
     metadata_url: String,
 ) -> std::result::Result<(), ClientError> {
@@ -27,6 +30,7 @@ pub async fn initialize_asset(
             system_program: system_program::ID,
         })
         .args(omni_oracle::instruction::InitializeAsset {
+            name,
             assetId,
             metadata_url,
         })
@@ -40,6 +44,18 @@ pub async fn initialize_asset(
         }
 }
 
+//get asset price
+async fn get_price(
+    program: &Program<Rc<Keypair>>,
+    asset: Pubkey,
+) -> Result<f64> {
+    // Fetch the account data
+    let account_data = program.account::<Asset>(asset).await;
+    
+    // Return the price field from the deserialized struct
+    Ok(account_data.unwrap().price)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create client
@@ -51,7 +67,16 @@ async fn main() -> Result<()> {
     
     let my_account_kp = Keypair::new();
 
-    let sig = initialize_asset(&program, my_account_kp.pubkey(), "https://example.com/metadata.json".to_string()).await;
-    print!("{:?}", sig);
+    //let sig = initialize_asset(&program, "Asset-NAME".to_string(), my_account_kp.pubkey(), "https://example.com/metadata.json".to_string()).await;
+    //print!("{:?}", sig);
+
+    //example coca cola data
+    let asset_id = Pubkey::from_str("9jcPQz32ZnzH3x861wXVnRPKv4wWqBJTo7XYPzFf8FUt").expect("Invalid Base58 String");
+
+    // Call the get_price function
+    match get_price(&program, asset_id).await {
+        Ok(price) => println!("Asset price: {}", price),
+        Err(err) => eprintln!("Error getting asset price: {}", err),
+    }
     Ok(())
 }
